@@ -40,6 +40,24 @@ def run_backtest():
     
     # 按照時間排序，準備時間步進 (Time-step Simulation)
     df = df.sort_values('timestamp').reset_index(drop=True)
+    
+    # ⚡ 批次計算 AI 預測以極大提升回測速度！
+    logger.info("⚡ 正在批次預測所有時間步長的 AI 訊號...")
+    try:
+        # 排除 AI 不需要的特徵
+        features = df.drop(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'symbol', 'Sweep_Low', 'Sweep_High', 'Target'], errors='ignore')
+        probs = predictor.predict_proba(features)
+        df['AI_Confidence'] = probs.max(axis=1)
+        df['AI_Signal'] = predictor.predict(features)
+        logger.info("✅ 批次預測完成！")
+    except Exception as e:
+        logger.error(f"批次預測失敗: {e}")
+        return
+
+    # 按照時間分組，將 O(N) 的 DataFrame 過濾轉為 O(1) 字典查找，速度提升 100 倍！
+    logger.info("⚡ 正在建立時間索引分組...")
+    grouped_data = {t: group for t, group in df.groupby('timestamp')}
+    
     timestamps = df['timestamp'].unique()
     
     balance = 1000.0
@@ -51,7 +69,7 @@ def run_backtest():
     logger.info(f"⏳ 開始歷史回測，總共涵蓋 {len(timestamps)} 個時間步長 (K線)...")
     
     for current_time in timestamps:
-        current_data = df[df['timestamp'] == current_time]
+        current_data = grouped_data[current_time]
         
         # 1. 檢查目前持倉是否觸發停損/平倉
         for symbol in list(positions.keys()):
@@ -80,19 +98,8 @@ def run_backtest():
         # 2. 尋找新的進場機會
         if len(positions) < Config.MAX_CONCURRENT_COINS:
             try:
-                state_df = current_data.copy()
-                # 排除 AI 不需要的特徵
-                features = state_df.drop(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'symbol', 'Sweep_Low', 'Sweep_High', 'Target'], errors='ignore')
-                
-                probs = predictor.predict_proba(features)
-                max_probs = probs.max(axis=1)
-                preds = predictor.predict(features)
-                
-                state_df['AI_Confidence'] = max_probs
-                state_df['AI_Signal'] = preds
-                
-                # 篩選出高勝率且有訊號的幣種
-                valid_signals = state_df[(state_df['AI_Confidence'] > Config.AI_MIN_CONFIDENCE) & (state_df['AI_Signal'] != 0)]
+                # 篩選出高勝率且有訊號的幣種 (已預先計算)
+                valid_signals = current_data[(current_data['AI_Confidence'] > Config.AI_MIN_CONFIDENCE) & (current_data['AI_Signal'] != 0)]
                 
                 for _, row in valid_signals.iterrows():
                     symbol = row['symbol']

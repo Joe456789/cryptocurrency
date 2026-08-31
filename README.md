@@ -31,7 +31,8 @@ MASOrchestrator（主調度中心）
 ├── SignalEngineer     信號工程師：SMC 結構 + 技術特徵提煉
 ├── RiskOfficer        風控官：倉位管理、移動停利、硬止損
 ├── ExecutionEngineer  執行工程師：API 下單、Telegram 通知
-└── SentimentAnalyst   情緒分析師：社群情緒指標融合
+├── SentimentAnalyst   情緒分析師：社群情緒 + 新聞情緒指標融合
+└── CIOAgent           首席投資長：盤後交易覆盤，用 LLM 產出動態規則
 ```
 
 ---
@@ -49,6 +50,22 @@ MASOrchestrator（主調度中心）
 | 風控執行頻率 | 1 秒級 |
 
 > 測試環境：Ubuntu 雲端伺服器，連接 BingX 交易所 API
+
+---
+
+## 實盤交易績效
+
+> 以下數據直接取自 BingX 交易所匯出的實際成交紀錄 (Order History)，非回測模擬。
+
+| 指標 | 數值 |
+|------|------|
+| 統計區間 | 2026-06-05 ～ 2026-08-31 |
+| 已平倉交易筆數 | 540 筆 |
+| 勝率 | 50.6%（273 勝 / 267 敗） |
+| 已實現總損益 | +3.63 USDT |
+| 手續費 | -2.51 USDT |
+
+小資金帳戶（單筆倉位約為本金 5%～15%），過程中持續依據每週實際成交數據做策略迭代：從初期因大量進場低流動性小幣導致虧損，逐步收緊風控（提高上雷達的量能門檻、動態 ATR 止損、Kelly 倍數上限），到後期加入震盪市均值回歸引擎與重複虧損懲罰機制，目標是在維持風控紀律的前提下逐步提高交易頻率並維持勝率。
 
 ---
 
@@ -75,11 +92,11 @@ PM2 行程管理器確保系統在例外崩潰後自動重啟，搭配 Telegram 
 
 ```bash
 # 安裝依賴
-pip install ccxt pandas numpy
+pip install -r requirements.txt
 
-# 設定 API 金鑰（core/config.py）
-API_KEY = "your_api_key"
-SECRET_KEY = "your_secret_key"
+# 設定 API 金鑰：用環境變數提供 (見 core/config.py 內的 os.getenv 預設值)
+export BINGX_API_KEY="your_api_key"
+export BINGX_SECRET_KEY="your_secret_key"
 
 # 啟動系統
 python run_bot.py

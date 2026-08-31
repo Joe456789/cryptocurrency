@@ -1,0 +1,10 @@
+ccxt
+pandas
+numpy
+ta
+requests
+schedule
+joblib
+matplotlib
+autogluon
+hmmlearn

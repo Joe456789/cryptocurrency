@@ -173,9 +173,23 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Cursor  
-#  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to 
+# Cursor
+#  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to
 #  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# --- 專案專屬 ---
+# 交易資料庫、訓練資料、模型權重都不進版控 (檔案大、含個人交易紀錄，且可由程式重新產生)
+*.db
+*.sqlite3
+AutogluonModels/
+data/
+dynamic_rules.json
+
+# BingX/交易所匯出的個人交易紀錄 (含帳號 UID，絕對不要上傳)
+Order_History_*/
+Transaction_History_*/
+
+.claude/

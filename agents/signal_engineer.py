@@ -5,7 +5,8 @@ import numpy as np
 # 📚 引入技術指標庫 (AI 特徵必需)
 # ==========================================
 from ta.momentum import RSIIndicator
-from ta.trend import MACD, EMAIndicator, ADXIndicator, SMAIndicator
+from ta.trend import MACD, EMAIndicator, ADXIndicator, SMAIndicator, AroonIndicator
+
 from ta.volatility import AverageTrueRange, BollingerBands
 from ta.volume import MFIIndicator, OnBalanceVolumeIndicator
 
@@ -150,6 +151,33 @@ class SignalEngineer:
             df['RSI_Min_5'] = df['RSI'].rolling(5).min()
             df['RSI_Max_5'] = df['RSI'].rolling(5).max()
 
+            # ==========================================
+            # 3. 方案五：AI 模型特徵升級 (5 大衍生量價指標)
+            # ==========================================
+            # 指標 1：買賣力道指數 (Force Index)
+            df['Force_Index_5'] = ((df['close'] - df['close'].shift(1)) * df['volume']).ewm(span=5, adjust=False).mean()
+            
+            # 指標 2：價格變化率 (ROC)
+            df['ROC_5'] = (df['close'] - df['close'].shift(5)) / (df['close'].shift(5) + 1e-8) * 100
+            df['ROC_12'] = (df['close'] - df['close'].shift(12)) / (df['close'].shift(12) + 1e-8) * 100
+            
+            # 指標 3：阿隆指標 (Aroon Up / Down)
+            if len(df) >= 15:
+                aroon = AroonIndicator(high=df['high'], low=df['low'], window=14, fillna=True)
+                df['Aroon_Up'] = aroon.aroon_up()
+                df['Aroon_Down'] = aroon.aroon_down()
+            else:
+                df['Aroon_Up'] = 0.0
+                df['Aroon_Down'] = 0.0
+
+            
+            # 指標 4：布林帶寬度百分比 (BB Width Pct)
+            df['BB_Width_Pct'] = (bb.bollinger_hband() - bb.bollinger_lband()) / (bb.bollinger_mavg() + 1e-8)
+            
+            # 指標 5：量價偏離度 (Price-Volume Divergence - PVD)
+            vol_roc = (df['volume'] - df['volume'].shift(5)) / (df['volume'].shift(5) + 1e-8) * 100
+            df['PVD'] = df['ROC_5'] - vol_roc
+
             df.fillna(0, inplace=True)
         except Exception as e:
             logger.error(f"特徵計算發生錯誤: {e}")
@@ -159,6 +187,10 @@ class SignalEngineer:
     @classmethod
     def process_all_features(cls, df):
         """一次計算包含 SMC、技術指標與 AI 特徵。此函數供 Quant Researcher 呼叫"""
+        if len(df) < 30:
+            logger.warning(f"⚠️ 資料筆數過少 ({len(df)} < 30)，跳過特徵工程以防指標計算崩潰。")
+            return df
+            
         df = cls.identify_swing_points(df)
         df = cls.detect_fvg(df)
         df = cls.detect_order_blocks(df)
